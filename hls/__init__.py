@@ -12,15 +12,15 @@
 # See "LICENSE" in the source distribution for more information.
 
 import os
-import urlparse
+from urllib.parse import urlparse, urljoin, urlunparse, urlsplit, ParseResult
 
 
 def make_url(base_url, url):
-    if urlparse.urlsplit(url).scheme == '':
-        url = urlparse.urljoin(base_url, url)
+    if urlsplit(url).scheme == '':
+        url = urljoin(base_url, url)
     if 'HLS_PLAYER_SHIFT_PORT' in os.environ.keys():
         shift = int(os.environ['HLS_PLAYER_SHIFT_PORT'])
-        p = urlparse.urlparse(url)
+        p = urlparse(url)
         loc = p.netloc
         if loc.find(":") != -1:
             loc, port = loc.split(':')
@@ -29,11 +29,12 @@ def make_url(base_url, url):
         elif p.scheme == "http":
             port = 80 + shift
             loc = loc + ":" + str(shift)
-        p = urlparse.ParseResult(scheme=p.scheme,
-                                 netloc=loc,
-                                 path=p.path,
-                                 params=p.params,
-                                 query=p.query,
-                                 fragment=p.fragment)
-        url = urlparse.urlunparse(p)
+        p = ParseResult(
+            scheme=p.scheme,
+            netloc=loc,
+            path=p.path,
+            params=p.params,
+            query=p.query,
+            fragment=p.fragment)
+        url = urlunparse(p)
     return url

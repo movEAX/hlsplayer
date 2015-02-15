@@ -20,9 +20,9 @@
 
 # Stdlib
 import sys
-import urlparse
 import optparse
 import logging
+from urllib.parse import urlsplit
 
 # 3rdparty
 from gi.repository import Gst
@@ -292,7 +292,7 @@ def main():
 
     for url in args:
         for l in range(options.n):
-            if urlparse.urlsplit(url).scheme == '':
+            if urlsplit(url).scheme == '':
                 url = "http://" + url
 
             c = HlsController(HlsFetcher(url, options))

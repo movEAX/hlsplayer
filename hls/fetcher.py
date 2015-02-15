@@ -15,7 +15,7 @@ from itertools import ifilter
 import logging
 import os, os.path
 import tempfile
-import urlparse
+from urllib.parse import urlparse
 
 from twisted.web import client
 from twisted.internet import defer, reactor
@@ -94,7 +94,7 @@ class HlsFetcher(object):
 
     def _download_file(self, f):
         l = hls.make_url(self._file_playlist.url, f['file'])
-        name = urlparse.urlparse(f['file']).path.split('/')[-1]
+        name = urlparse(f['file']).path.split('/')[-1]
         path = os.path.join(self.path, name)
         d = self._download_page(l, path)
         d.addCallback(self._got_file, l, f)
