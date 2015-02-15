@@ -134,7 +134,7 @@ class M3U8(object):
             elif l.startswith('#EXT-X-DISCONTINUITY'):
                 discontinuity = True
             elif l.startswith('#EXT-X-PROGRAM-DATE-TIME'):
-                print l
+                pass
             elif l.startswith('#EXT-X-ALLOW-CACHE'):
                 allow_cache = l[19:]
             elif l.startswith('#EXTINF'):
@@ -157,7 +157,7 @@ class M3U8(object):
                     self._files[i]['endlist'] = True
                 self._endlist = True
             elif len(l.strip()) != 0:
-                print l
+                pass
 
         if not self.has_programs() and not self.target_duration:
             logging.error("Invalid HLS stream: no programs & no duration")

@@ -122,7 +122,7 @@ class HLSFetcher(object):
 
     def _handle_end(self, failure):
         failure.trap(StopIteration)
-        print "End of media"
+        logging.info("End of media")
         reactor.stop()
 
     def _get_files_loop(self, last_file=None):
