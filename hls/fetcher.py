@@ -21,10 +21,10 @@ from twisted.web import client
 from twisted.internet import defer, reactor
 from twisted.internet.task import deferLater
 
-import HLS
-from HLS.m3u8 import M3U8
+import hls
+from .m3u8 import M3U8
 
-class HLSFetcher(object):
+class HlsFetcher(object):
 
     def __init__(self, url, options, program=1):
         self.url = url
@@ -93,7 +93,7 @@ class HLSFetcher(object):
         return (path, l, f)
 
     def _download_file(self, f):
-        l = HLS.make_url(self._file_playlist.url, f['file'])
+        l = hls.make_url(self._file_playlist.url, f['file'])
         name = urlparse.urlparse(f['file']).path.split('/')[-1]
         path = os.path.join(self.path, name)
         d = self._download_page(l, path)
@@ -140,7 +140,7 @@ class HLSFetcher(object):
             # if we got a program playlist, save it and start a program
             self._program_playlist = pl
             (program_url, _) = pl.get_program_playlist(self.program, self.bitrate)
-            l = HLS.make_url(self.url, program_url)
+            l = hls.make_url(self.url, program_url)
             return self._reload_playlist(M3U8(l))
         elif pl.has_files():
             # we got sequence playlist, start reloading it regularly, and get files

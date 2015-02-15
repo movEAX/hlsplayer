@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 setup(
     name = "HLSPlayer",
-    version = "0.1",
+    version = "0.2",
     packages = find_packages(),
     entry_points = {
-        'console_scripts': [ 'hls-player = HLS.player:main' ]
-        },
+        'console_scripts': [ 'hls-player = hls.player:main' ]
+    },
 
     author = "Marc-Andre Lureau",
     author_email = "marcandre.lureau@gmail.com",

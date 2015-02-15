@@ -34,7 +34,7 @@ gtk2reactor.install()
 from twisted.internet import reactor
 
 # own
-from .fetcher import HLSFetcher
+from .fetcher import HlsFetcher
 from .m3u8 import M3U8
 
 #-------------------------------------------------------------------------------
@@ -295,7 +295,7 @@ def main():
             if urlparse.urlsplit(url).scheme == '':
                 url = "http://" + url
 
-            c = HlsController(HLSFetcher(url, options))
+            c = HlsController(HlsFetcher(url, options))
             if not options.nodisplay:
                 p = GstPlayer(display = not options.save)
                 c.set_player(p)
