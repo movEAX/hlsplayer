@@ -23,10 +23,12 @@ import sys
 import optparse
 import logging
 from urllib.parse import urlsplit
+from functools import reduce
 
 # 3rdparty
 from gi.repository import Gst, Gdk, Gtk, GObject
 GObject.threads_init()
+Gst.init()
 
 from twisted.internet import gtk3reactor
 gtk3reactor.install()
@@ -102,8 +104,8 @@ class GstPlayer:
         self.appsrc.set_property("max-bytes", 10000)
         
         if display:
-            self.decodebin = Gst.ElementFactory.make("decodebin2", "decodebin")
-            self.decodebin.connect("new-decoded-pad", self.on_decoded_pad)
+            self.decodebin = Gst.ElementFactory.make("decodebin", "decodebin")
+            self.decodebin.connect("pad-added", self.on_decoded_pad)
             self.player.add(self.appsrc, self.decodebin)
             link_many(self.appsrc, self.decodebin)
         else:
