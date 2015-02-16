@@ -25,9 +25,8 @@ import logging
 from urllib.parse import urlsplit
 
 # 3rdparty
-from gi.repository import Gst
-import pygtk, gtk, gobject
-gobject.threads_init()
+from gi.repository import Gst, Gdk, Gtk, GObject
+GObject.threads_init()
 
 from twisted.internet import gtk2reactor
 gtk2reactor.install()
@@ -87,12 +86,12 @@ class GstPlayer:
 
     def __init__(self, display=True):
         if display:
-            self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+            self.window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
             self.window.set_title("Video-Player")
             self.window.set_default_size(500, 400)
-            self.window.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
+            self.window.set_type_hint(Gdk.WindowTypeHint.DIALOG)
             self.window.connect('delete-event', lambda _: reactor.stop())
-            self.movie_window = gtk.DrawingArea()
+            self.movie_window = Gtk.DrawingArea()
             self.window.add(self.movie_window)
             self.window.show_all()
 
@@ -161,11 +160,11 @@ class GstPlayer:
         message_name = message.structure.get_name()
         if message_name == "prepare-xwindow-id":
             imagesink = message.src
-            gtk.gdk.threads_enter()
-            gtk.gdk.display_get_default().sync()
+            Gdk.threads_enter()
+            Gdk.Display.get_default().sync()
             imagesink.set_property("force-aspect-ratio", True)
             imagesink.set_xwindow_id(self.movie_window.window.xid)
-            gtk.gdk.threads_leave()
+            Gdk.threads_leave()
 
     def on_decoded_pad(self, decodebin, pad, more_pad):
         c = pad.get_caps().to_string()
@@ -222,7 +221,7 @@ def link_many(*queues):
 
 
 def main():
-    gtk.gdk.threads_init()
+    Gdk.threads_init()
     parser = optparse.OptionParser(usage='%prog [options] url...', version="%prog")
 
     parser.add_option('-v', '--verbose', 
