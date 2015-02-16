@@ -28,8 +28,8 @@ from urllib.parse import urlsplit
 from gi.repository import Gst, Gdk, Gtk, GObject
 GObject.threads_init()
 
-from twisted.internet import gtk2reactor
-gtk2reactor.install()
+from twisted.internet import gtk3reactor
+gtk3reactor.install()
 from twisted.internet import reactor
 
 # own
