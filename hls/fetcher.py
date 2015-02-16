@@ -11,7 +11,6 @@
 # warranty of merchantability or fitness for a particular purpose.
 # See "LICENSE" in the source distribution for more information.
 
-from itertools import ifilter
 import logging
 import os, os.path
 import tempfile
@@ -75,7 +74,7 @@ class HlsFetcher(object):
 
     def delete_cache(self, f):
         keys = self._cached_files.keys()
-        for i in ifilter(f, keys):
+        for i in filter(f, keys):
             filename = self._cached_files[i]
             logging.debug("Removing %r" % filename)
             os.remove(filename)
@@ -101,8 +100,8 @@ class HlsFetcher(object):
         return d
 
     def _get_next_file(self, last_file=None):
-        next = self._files.next()
-        if next:
+        next_file = next(self._files)
+        if next_file:
             delay = 0
             if last_file:
                 if not self._cached_files.has_key(last_file['sequence'] - 1) or \
@@ -114,7 +113,7 @@ class HlsFetcher(object):
                     delay = 1 # last_file['duration'] doesn't work
                               # when duration is not in sync with
                               # player, which can happen easily...
-            return deferLater(reactor, delay, self._download_file, next)
+            return deferLater(reactor, delay, self._download_file, next_file)
         elif not self._file_playlist.endlist():
             self._file_playlisted = defer.Deferred()
             self._file_playlisted.addCallback(lambda x: self._get_next_file(last_file))
@@ -179,7 +178,7 @@ class HlsFetcher(object):
         d = defer.Deferred()
         keys = self._cached_files.keys()
         try:
-            sequence = ifilter(lambda x: x >= sequence, keys).next()
+            sequence = next(filter(lambda x: x >= sequence, keys))
             filename = self._cached_files[sequence]
             d.callback(filename)
         except:
