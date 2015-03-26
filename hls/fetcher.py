@@ -11,190 +11,70 @@
 # warranty of merchantability or fitness for a particular purpose.
 # See "LICENSE" in the source distribution for more information.
 
+#------------------------------------------------------------------------------
+# Imports 
+#------------------------------------------------------------------------------
+
+# Stdlib
 import logging
 import os, os.path
 import tempfile
+import asyncio
+from datetime import datetime
 from urllib.parse import urlparse
 
-from twisted.web import client
-from twisted.internet import defer, reactor
-from twisted.internet.task import deferLater
+# 3rdparty
+import m3u8
+import requests
+from m3u8.model import M3U8
 
-import hls
-from .m3u8 import M3U8
+#------------------------------------------------------------------------------
+# Constants
+#------------------------------------------------------------------------------
 
-class HlsFetcher(object):
+BITRATE_CRITERIA = 1000
+RELOAD_TIMEOUT = 20
 
-    def __init__(self, url, options, program=1):
-        self.url = url
-        self.path = options.path
-        self.referer = options.referer
-        if not self.path:
-            self.path = tempfile.mkdtemp()
-        self.program = program
-        self.bitrate = options.bitrate
-        self.n_segments_keep = options.keep
+#------------------------------------------------------------------------------
+# Fetcher implementation
+#------------------------------------------------------------------------------
 
-        self._program_playlist = None
-        self._file_playlist = None
-        self._cookies = {}
-        self._cached_files = {}
+@asyncio.coroutine
+def on_playlist_downloaded(pl: M3U8):
+    if pl.playlists:
+        logging.info('Loaded variant.m3u8')
+        url = pl.playlists[0].absolute_uri
+        asyncio.async(reload_playlist(url))
+    elif pl.files:
+        logging.info('Loaded playlist.m3u8')
+        utc_timestamp = str(datetime.utcnow().timestamp())
+        url_tpl = '{base}/playlist.m3u8?utcstart={utc}'
+        url = url_tpl.format(
+            base=pl.base_uri,
+            utc=utc_timestamp)
+        asyncio.async(reload_playlist(url, timeout=RELOAD_TIMEOUT))
+        [asyncio.async(download_and_save(url)) for url in pl.files]
+    else:
+        logging.error('Playlist is empty: \n%r', pl.dumps())
+        raise
 
-        self._files = None # the iter of the playlist files download
-        self._next_download = None # the delayed download defer, if any
-        self._file_playlisted = None # the defer to wait until new files are added to playlist
+@asyncio.coroutine
+def reload_playlist(uri, *, timeout=None):
+    logging.info('Reload playlist %r with timeout %r', uri, timeout)
+    if timeout:
+        yield from asyncio.sleep(timeout)
+    pl = m3u8.load(uri)
+    asyncio.async(on_playlist_downloaded(pl))
 
-    def _get_page(self, url):
-        def got_page(content):
-            logging.debug("Cookies: %r" % self._cookies)
-            return content
-        url = url.encode("utf-8")
-        if 'HLS_RESET_COOKIES' in os.environ.keys():
-            self._cookies = {}
-        headers = {}
-        if self.referer:
-            headers['Referer'] = self.referer
-        d = client.getPage(url, cookies=self._cookies, headers=headers)
-        d.addCallback(got_page)
-        return d
 
-    def _download_page(self, url, path):
-        # client.downloadPage does not support cookies!
-        def _check(x):
-            logging.debug("Received segment of %r bytes." % len(x))
-            return x
+@asyncio.coroutine
+def download_and_save(uri):
+    logging.info('Donwload ts file %r', uri)
+    response = requests.get(uri)
+    if response.status_code == 200:
+        filename = uri.rsplit('/', 1)[1]
+        with open('/tmp/' + filename, 'wb') as fh:
+            fh.write(response.content)
 
-        d = self._get_page(url)
-        f = open(path, 'w')
-        d.addCallback(_check)
-        d.addCallback(lambda x: f.write(x))
-        d.addBoth(lambda _: f.close())
-        d.addCallback(lambda _: path)
-        return d
-
-    def delete_cache(self, f):
-        keys = self._cached_files.keys()
-        for i in filter(f, keys):
-            filename = self._cached_files[i]
-            logging.debug("Removing %r" % filename)
-            os.remove(filename)
-            del self._cached_files[i]
-        self._cached_files
-
-    def _got_file(self, path, l, f):
-        logging.debug("Saved " + l + " in " + path)
-        self._cached_files[f['sequence']] = path
-        if self.n_segments_keep != -1:
-            self.delete_cache(lambda x: x <= f['sequence'] - self.n_segments_keep)
-        if self._new_filed:
-            self._new_filed.callback((path, l, f))
-            self._new_filed = None
-        return (path, l, f)
-
-    def _download_file(self, f):
-        l = hls.make_url(self._file_playlist.url, f['file'])
-        name = urlparse(f['file']).path.split('/')[-1]
-        path = os.path.join(self.path, name)
-        d = self._download_page(l, path)
-        d.addCallback(self._got_file, l, f)
-        return d
-
-    def _get_next_file(self, last_file=None):
-        next_file = next(self._files)
-        if next_file:
-            delay = 0
-            if last_file:
-                if not self._cached_files.has_key(last_file['sequence'] - 1) or \
-                        not self._cached_files.has_key(last_file['sequence'] - 2):
-                    delay = 0
-                elif self._file_playlist.endlist():
-                    delay = 1
-                else:
-                    delay = 1 # last_file['duration'] doesn't work
-                              # when duration is not in sync with
-                              # player, which can happen easily...
-            return deferLater(reactor, delay, self._download_file, next_file)
-        elif not self._file_playlist.endlist():
-            self._file_playlisted = defer.Deferred()
-            self._file_playlisted.addCallback(lambda x: self._get_next_file(last_file))
-            return self._file_playlisted
-
-    def _handle_end(self, failure):
-        failure.trap(StopIteration)
-        logging.info("End of media")
-        reactor.stop()
-
-    def _get_files_loop(self, last_file=None):
-        if last_file:
-            (path, l, f) = last_file
-        else:
-            f = None
-        d = self._get_next_file(f)
-        # and loop
-        d.addCallback(self._get_files_loop)
-        d.addErrback(self._handle_end)
-
-    def _playlist_updated(self, pl):
-        if pl.has_programs():
-            # if we got a program playlist, save it and start a program
-            self._program_playlist = pl
-            (program_url, _) = pl.get_program_playlist(self.program, self.bitrate)
-            l = hls.make_url(self.url, program_url)
-            return self._reload_playlist(M3U8(l))
-        elif pl.has_files():
-            # we got sequence playlist, start reloading it regularly, and get files
-            self._file_playlist = pl
-            if not self._files:
-                self._files = pl.iter_files()
-            if not pl.endlist():
-                reactor.callLater(pl.reload_delay(), self._reload_playlist, pl)
-            if self._file_playlisted:
-                self._file_playlisted.callback(pl)
-                self._file_playlisted = None
-        else:
-            raise
-        return pl
-
-    def _got_playlist_content(self, content, pl):
-        if not pl.update(content):
-            # if the playlist cannot be loaded, start a reload timer
-            d = deferLater(reactor, pl.reload_delay(), self._fetch_playlist, pl)
-            d.addCallback(self._got_playlist_content, pl)
-            return d
-        return pl
-
-    def _fetch_playlist(self, pl):
-        logging.debug('fetching %r' % pl.url)
-        d = self._get_page(pl.url)
-        return d
-
-    def _reload_playlist(self, pl):
-        d = self._fetch_playlist(pl)
-        d.addCallback(self._got_playlist_content, pl)
-        d.addCallback(self._playlist_updated)
-        return d
-
-    def get_file(self, sequence):
-        d = defer.Deferred()
-        keys = self._cached_files.keys()
-        try:
-            sequence = next(filter(lambda x: x >= sequence, keys))
-            filename = self._cached_files[sequence]
-            d.callback(filename)
-        except:
-            d.addCallback(lambda x: self.get_file(sequence))
-            self._new_filed = d
-            keys.sort()
-            logging.debug('waiting for %r (available: %r)' % (sequence, keys))
-        return d
-
-    def start(self):
-        self._files = None
-        d = self._reload_playlist(M3U8(self.url))
-        d.addCallback(lambda _: self._get_files_loop())
-        self._new_filed = defer.Deferred()
-        return self._new_filed
-
-    def stop(self):
-        pass
-
+def start(url):
+    asyncio.async(reload_playlist(url))

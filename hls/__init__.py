@@ -18,7 +18,7 @@ from urllib.parse import urlparse, urljoin, urlunparse, urlsplit, ParseResult
 def make_url(base_url, url):
     if urlsplit(url).scheme == '':
         url = urljoin(base_url, url)
-    if 'HLS_PLAYER_SHIFT_PORT' in os.environ.keys():
+    if 'HLS_PLAYER_SHIFT_PORT' in list(os.environ.keys()):
         shift = int(os.environ['HLS_PLAYER_SHIFT_PORT'])
         p = urlparse(url)
         loc = p.netloc

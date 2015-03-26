@@ -53,3 +53,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Testdata
+testdata/
+
+# Vim
+*.swp
