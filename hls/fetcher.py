@@ -39,6 +39,8 @@ RELOAD_TIMEOUT = 20
 # Fetcher implementation
 #------------------------------------------------------------------------------
 
+count = 0
+
 @asyncio.coroutine
 def on_playlist_downloaded(pl: M3U8):
     if pl.playlists:
@@ -69,12 +71,14 @@ def reload_playlist(uri, *, timeout=None):
 
 @asyncio.coroutine
 def download_and_save(uri):
+    global count
     logging.info('Donwload ts file %r', uri)
     response = requests.get(uri)
     if response.status_code == 200:
         filename = uri.rsplit('/', 1)[1]
-        with open('/tmp/' + filename, 'wb') as fh:
+        with open('/tmp/video{:05d}.ts'.format(count), 'wb') as fh:
             fh.write(response.content)
+        count += 1
 
 def start(url):
     asyncio.async(reload_playlist(url))
