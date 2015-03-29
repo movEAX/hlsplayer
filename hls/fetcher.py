@@ -33,7 +33,7 @@ from m3u8.model import M3U8
 #------------------------------------------------------------------------------
 
 BITRATE_CRITERIA = 1000
-RELOAD_TIMEOUT = 20
+RELOAD_TIMEOUT = 7
 
 #------------------------------------------------------------------------------
 # Fetcher implementation
@@ -48,7 +48,7 @@ def on_playlist_downloaded(pl: M3U8):
         url = pl.playlists[0].absolute_uri
         asyncio.async(reload_playlist(url))
     elif pl.files:
-        logging.info('Loaded playlist.m3u8')
+        logging.info('Loaded playlist.m3u8 with files count: %d', len(pl.files))
         utc_timestamp = str(datetime.utcnow().timestamp())
         url_tpl = '{base}/playlist.m3u8?utcstart={utc}'
         url = url_tpl.format(

@@ -64,7 +64,6 @@ class GstPlayer:
         self.window = Gtk.Window(Gtk.WindowType.TOPLEVEL)
         self.window.set_title("Video-Player")
         self.window.set_default_size(500, 400)
-        self.window.set_type_hint(Gdk.WindowTypeHint.DIALOG)
         self.window.connect('delete-event', lambda *_: loop.stop())
         self.drawing_area = Gtk.DrawingArea()
         self.window.add(self.drawing_area)
@@ -86,6 +85,8 @@ class GstPlayer:
         bus.connect("sync-message::element", self.on_sync_message)
         
         self._playing = False
+        self._sync_video = False
+        self._sync_audio = False
 
     def play(self):
         self.player.set_state(Gst.State.PLAYING)
@@ -98,11 +99,13 @@ class GstPlayer:
     def on_message(self, bus, message):
         t = message.type
         if t == Gst.MessageType.EOS:
-            self.player.set_state(Gst.State.NULL)
+            self.stop()
+            logging.info('EOS')
         elif t == Gst.MessageType.ERROR:
-            self.player.set_state(Gst.State.NULL)
+            self.stop()
             err, debug = message.parse_error()
             logging.error(err)
+            self.play()
         elif t == Gst.MessageType.STATE_CHANGED:
             if message.src == self.player:
                 o, n, p = message.parse_state_changed()
@@ -120,13 +123,15 @@ class GstPlayer:
 
     def on_decoded_pad(self, decodebin, pad):
         logging.debug('%r %r', pad, pad.__dict__)
+       
         c = pad.get_current_caps().to_string()
-        if "video" in c:
+        if "video" in c and not self._sync_video:
             videosink = Gst.ElementFactory.make("xvimagesink", "videosink")
             self.player.add(videosink)
             pad.link(videosink.get_static_pad('sink'))
             videosink.set_state(Gst.State.PLAYING)
-        elif "audio" in c:
+            self._sync_video = True
+        elif "audio" in c and not self._sync_audio:
             q2 = Gst.ElementFactory.make("queue", "aqueue")
             q2.props.max_size_buffers = 0
             q2.props.max_size_time = 0
@@ -141,3 +146,4 @@ class GstPlayer:
                 e.set_state(Gst.State.PLAYING)
             sink_pad = q2.get_static_pad("sink")
             pad.link(sink_pad)
+            self._sync_audio = True

@@ -6,6 +6,7 @@ import sys
 import asyncio
 import optparse
 import logging
+from concurrent.futures import ProcessPoolExecutor
 
 from gi.repository import Gtk
 
@@ -42,15 +43,16 @@ def main():
     url = args[0]
     url = url.startswith("http") and url or ('http://' + url) 
 
-    player = GstPlayer()
-    player.play()
     start_fetch(url)
-    asyncio.async(__gtk_main()) 
     loop = asyncio.get_event_loop()
+    executor = ProcessPoolExecutor(1)
+    asyncio.async(loop.run_in_executor(executor, _run_player))
+
     loop.run_forever()
 
-@asyncio.coroutine
-def __gtk_main():
+def _run_player():
+    player = GstPlayer()
+    player.play()
     Gtk.main()
 
 if __name__ == '__main__':
